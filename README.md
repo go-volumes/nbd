@@ -1,10 +1,13 @@
 # go-volumes/nbd
 
 A pure-Go (`CGO_ENABLED=0`), standard-library-only **NBD (Network Block
-Device) server** that exports a [`volume.Device`](https://github.com/go-volumes/interface)
-so a remote client — the Linux kernel `nbd-client`, `qemu-nbd`/QEMU, or
-`libnbd`/`nbdinfo`/`nbdcopy` — can read and write a go-volumes block volume
-over the network.
+Device) server and client**. The server exports a
+[`volume.Device`](https://github.com/go-volumes/interface) so a remote client —
+the Linux kernel `nbd-client`, `qemu-nbd`/QEMU, `libnbd`/`nbdinfo`/`nbdcopy`, or
+this package's own client — can read and write a go-volumes block volume over
+the network. The client dials a fixed-newstyle NBD server and exposes the remote
+export as a `volume.Device`, so a remote volume is consumed exactly like a local
+one (e.g. as a synchronous replica in `github.com/go-volumes/replica`).
 
 It implements the **fixed-newstyle** handshake and the transmission phase of
 the [NBD protocol](https://github.com/NetworkBlockDevice/nbd/blob/master/doc/proto.md).
@@ -43,6 +46,32 @@ exp := nbd.ReadOnlyExport("iso", roBacking)
 
 `Server.Handle(conn net.Conn)` runs a single connection (useful for custom
 listeners or `net.Pipe` in tests).
+
+### Client
+
+```go
+cli, err := nbd.DialExport(ctx, "host:10809", "data")
+if err != nil { /* ... */ }
+defer cli.Close() // sends NBD_CMD_DISC, then closes the connection
+
+var dev volume.Device = cli            // *Client satisfies volume.Device
+n, _ := dev.ReadAt(buf, off)           // → NBD_CMD_READ
+_, _ = dev.WriteAt(buf, off)           // → NBD_CMD_WRITE (rejected if read-only)
+_ = dev.Sync()                         // → NBD_CMD_FLUSH
+```
+
+`Dial`/`DialExport` perform the client side of the fixed-newstyle handshake:
+they read `NBDMAGIC`/`IHAVEOPT`/flags, send `C_FIXED_NEWSTYLE`, then negotiate
+with `NBD_OPT_GO` (consuming `NBD_REP_INFO`/`NBD_INFO_EXPORT` → `NBD_REP_ACK`),
+falling back to `NBD_OPT_EXPORT_NAME` when the server lacks `NBD_OPT_GO`
+(`WithExportNameOpt()` forces the legacy path). The negotiated size feeds
+`Size()`; the transmission flags drive read-only rejection and `Discard` (only
+available when the server advertised `SEND_TRIM`, satisfying `volume.Discarder`).
+A `*Client` is safe for concurrent use — one background goroutine reads all
+replies and demultiplexes them to callers by request handle — so a replication
+engine can issue concurrent operations against it. Server errnos surface as Go
+errors matchable with `errors.Is` against `nbd.ErrEPERM`/`ErrEINVAL`/`ErrEIO`/
+`ErrENOSPC`/`ErrEOVERFLOW`.
 
 ### Connecting with a real client
 
