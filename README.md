@@ -1,4 +1,8 @@
-# go-volumes/nbd
+# nbd
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/go-volumes/nbd.svg)](https://pkg.go.dev/github.com/go-volumes/nbd)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
+[![CI](https://github.com/go-volumes/nbd/actions/workflows/ci.yml/badge.svg)](https://github.com/go-volumes/nbd/actions/workflows/ci.yml)
 
 A pure-Go (`CGO_ENABLED=0`), standard-library-only **NBD (Network Block
 Device) server and client**. The server exports a
