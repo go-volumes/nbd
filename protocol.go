@@ -1,11 +1,13 @@
-// Package nbd implements the server side of the Network Block Device (NBD)
-// protocol over the fixed-newstyle handshake, exporting a go-volumes
+// Package nbd implements both sides of the Network Block Device (NBD)
+// protocol over the fixed-newstyle handshake. Server exports a go-volumes
 // volume.Device so a remote client (the Linux kernel nbd-client, qemu-nbd,
-// libnbd/nbdinfo/nbdcopy, …) can read and write a block volume across a
-// network connection.
+// libnbd/nbdinfo/nbdcopy, or this package's own Client) can read and write a
+// block volume across a network connection; Client dials a remote NBD server
+// and exposes the negotiated export as a volume.Device, so a remote volume is
+// consumed exactly like a local one.
 //
 // The wire protocol follows github.com/NetworkBlockDevice/nbd doc/proto.md.
-// All multi-byte integers are big-endian (network byte order); the server is
+// All multi-byte integers are big-endian (network byte order); both sides are
 // therefore exercised on big-endian targets (s390x) in CI.
 //
 // The implementation is pure Go, CGO-free, and depends only on the standard
